@@ -1,0 +1,3 @@
+FLASK_APP=scanni.py
+FLASK_DEBUG=1
+FLASK_CONFIG=dev

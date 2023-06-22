@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Hi, {{ current_user.username }}!</h2>
+    <div class="center">
+        <h2>QR Code Scanner</h2>
+        <img id="video_frame" src="{{ url_for('video_feed') }}">
+
+        <div class="status">
+            <h3 id="message" class="message message-info">SCAN YOUR QR CODE</h3>
+            <p id="button", class ="hidden">
+                <a id="file_link" href="#">Click here to see plan!</a>
+            </p>
+        </div>
+    </div>
+{% endblock %}

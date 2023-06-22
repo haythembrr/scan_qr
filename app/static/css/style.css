@@ -1,0 +1,16 @@
+.center {
+    text-align: center;
+  }
+
+.visible {
+  display: block;
+}
+
+.hidden {
+  display: none;
+}
+
+#video_frame {
+  height: 30%;
+  width: 30%;
+}
