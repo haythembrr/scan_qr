@@ -1,9 +1,10 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField,TextAreaField, DateField
 from wtforms.validators import ValidationError, DataRequired, Email, EqualTo
-from app.models import User
-from wtforms import StringField, TextAreaField, SubmitField
+from app.models import User, Role
 from wtforms.validators import DataRequired, Length
+from wtforms_sqlalchemy.fields import QuerySelectField
+
 
 
 class LoginForm(FlaskForm):
@@ -12,12 +13,17 @@ class LoginForm(FlaskForm):
     remember_me = BooleanField('Remember Me')
     submit = SubmitField('Sign In')
 
+def enabled_categories():
+    return Role.query
+
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     password2 = PasswordField(
         'Repeat Password', validators=[DataRequired(), EqualTo('password')])
+    active = BooleanField('Active')
+    role = QuerySelectField(query_factory=enabled_categories, get_label='name', allow_blank=True)
     submit = SubmitField('Register')
 
     def validate_username(self, username):
@@ -44,3 +50,20 @@ class EditProfileForm(FlaskForm):
             user = User.query.filter_by(username=self.username.data).first()
             if user is not None:
                 raise ValidationError('Please use a different username.')
+            
+class EditMachineForm(FlaskForm):
+    manufacturer = StringField('Manufacturer', validators=[DataRequired()])
+    location = StringField('Location', validators=[DataRequired()])
+    status = BooleanField('Status', validators=[DataRequired()])
+    install_date = DateField('Install date', validators=[DataRequired()])
+    comment = TextAreaField('Comment', validators=[Length(min=0, max=140)])
+    submit = SubmitField('Submit')
+
+
+class AddMachineForm(FlaskForm):
+    manufacturer = StringField('Manufacturer', validators=[DataRequired()])
+    location = StringField('Location', validators=[DataRequired()])
+    status = BooleanField('Status', validators=[DataRequired()])
+    install_date = DateField('Install date', validators=[DataRequired()])
+    comment = TextAreaField('Comment', validators=[Length(min=0, max=140)])
+    submit = SubmitField('Submit')

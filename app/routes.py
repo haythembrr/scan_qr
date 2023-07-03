@@ -1,19 +1,18 @@
 from app import app, db
-from app.forms import LoginForm, RegistrationForm, EditProfileForm
-from flask import render_template, flash, redirect, url_for, request, Response
+from app.forms import LoginForm, RegistrationForm, EditProfileForm, EditMachineForm, AddMachineForm
+from flask import render_template, flash, redirect, url_for, request, Response, session
 from flask_login import current_user, login_user, logout_user, login_required
-from app.models import User
+from app.models import User, Role, Machine, Document, Intervention
 from werkzeug.urls import url_parse
 import cv2
-from PyPDF2 import PdfFileReader
-import os
 from datetime import datetime
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 from qr_scanner import QRScanner
-import time
+import base64
+import sys
+
 
 socketio = SocketIO(app, cors_allowed_origins="*")
-myDataDB = ["1", "2"]
 qr_code_scanner = QRScanner()
 
 
@@ -41,10 +40,12 @@ def scan_for_qr():
 
         for barcode in result:
             myData = barcode.data.decode("utf-8")
-            if myData in myDataDB:
+            with app.app_context():
+                machine = Machine.query.filter_by(id=int(myData)).first()
+            if machine:
                 socketio.emit(
                     "scan_result",
-                    {"status": "granted", "message": f"ID : {myData}", "file_id" : myData}
+                    {"status": "granted", "message": f"ID : {myData}", "machine_id" : myData}
                 )
                 is_granted = True
             else:
@@ -70,19 +71,20 @@ def scan_for_qr():
     
 
 @app.route('/video_feed')
+@login_required
 def video_feed():
     return Response(scan_for_qr(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/display_pdf/<file_id>')
+@login_required
 def display_pdf(file_id):
-    pdf = PdfFileReader(open('app/static/plans/' + file_id + '.pdf', 'rb'))
-    num_pages = pdf.getNumPages()
-
-
+    file_blob = Document.query.filter_by(id=file_id).first().blob
+    # Base64 encode the PDF data
+    encoded_pdf = base64.b64encode(file_blob).decode('utf-8')
     # Render the PDF document template and pass the number of pages
-    return render_template('display_pdf.html', num_pages=num_pages, file_id=file_id)
+    return render_template('display_pdf.html', encoded_pdf = encoded_pdf)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -109,12 +111,13 @@ def logout():
     return redirect(url_for('index'))
 
 @app.route('/register', methods=['GET', 'POST'])
+@login_required
 def register():
-    if current_user.is_authenticated:
+    if not current_user.role == 2:
         return redirect(url_for('index'))
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(username=form.username.data, email=form.email.data)
+        user = User(username=form.username.data, email=form.email.data, active=form.active.data, role=form.role.data.id)
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
@@ -127,11 +130,7 @@ def register():
 @login_required
 def user(username):
     user = User.query.filter_by(username=username).first_or_404()
-    posts = [
-        {'author': user, 'body': 'Test post #1'},
-        {'author': user, 'body': 'Test post #2'}
-    ]
-    return render_template('user.html', user=user, posts=posts)
+    return render_template('user.html', user=user)
 
 @app.before_request
 def before_request():
@@ -155,3 +154,91 @@ def edit_profile():
         form.about_me.data = current_user.about_me
     return render_template('edit_profile.html', title='Edit Profile',
                            form=form)
+
+
+@app.route('/machine/<machine_id>')
+@login_required
+def machine(machine_id):
+    machine = Machine.query.filter_by(id=machine_id).first_or_404()
+    documents = Document.query.filter_by(machine_id=machine_id)
+    interventions = Intervention.query.filter_by(machine_id=machine_id)
+    return render_template('machine.html', machine=machine, documents=documents, machine_id=machine_id, interventions = interventions)
+
+
+@app.route('/edit_machine/<machine_id>', methods=['GET', 'POST'])
+@login_required
+def edit_machine(machine_id):
+    machine = Machine.query.filter_by(id=machine_id).first_or_404()
+    form = EditMachineForm()
+    if form.validate_on_submit():
+        machine.manufacturer = form.manufacturer.data
+        machine.location = form.location.data
+        machine.status = form.status.data
+        machine.install_date = form.install_date.data
+        machine.comment = form.comment.data
+        db.session.commit()
+        flash('Your changes have been saved.')
+        return redirect(url_for('edit_machine', machine_id=machine_id))
+    elif request.method == 'GET':
+        form.manufacturer.data = machine.manufacturer
+        form.location.data = machine.location 
+        form.status.data = machine.status
+        form.install_date.data = machine.install_date
+        form.comment.data = machine.comment
+    return render_template('edit_machine.html', form=form)
+
+@app.route('/add_machine', methods=['GET', 'POST'])
+@login_required
+def add_machine():
+    form = AddMachineForm()
+    if form.validate_on_submit():
+        machine = Machine(manufacturer=form.manufacturer.data, location=form.location.data, status=form.status.data, 
+                          install_date=form.install_date.data, comment =form.comment.data)
+        db.session.add(machine)
+        db.session.commit()
+        flash('Congratulations, you added a new machine!')
+    return render_template('add_machine.html', form=form)
+
+
+@app.route('/add_document/<machine_id>', methods=['GET', 'POST'])
+@login_required
+def add_document(machine_id):
+    if request.method == 'POST':
+        # check if the post request has the file part
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        file = request.files['file']
+        # If the user does not select a file, the browser submits an
+        # empty file without a filename.
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+        if file:
+            document = Document(machine_id=machine_id, type='Plan', upload_date=datetime.utcnow(), 
+                                blob=file.read(), size=sys.getsizeof(file.read()))
+            db.session.add(document)
+            db.session.commit()
+            flash('Document added!')
+            return redirect(url_for('add_document', machine_id = machine_id) )
+    return render_template('add_document.html')
+
+@app.route('/ongoing_intervention/<machine_id>', methods=['GET', 'POST'])
+@login_required
+def ongoing_intervention(machine_id):
+    if request.method == 'POST':
+        intervention = Intervention(machine_id=request.view_args.get('machine_id'), user_id=current_user.id, type="Reparation",
+                                        comment = "", start_date = datetime.utcnow(), end_date = datetime.utcnow())
+        db.session.add(intervention)
+        db.session.commit()
+        flash('Intervention ended!')
+        return redirect(url_for('machine', machine_id = machine_id) )
+    return render_template('intervention.html')
+
+
+
+
+
+
+
+

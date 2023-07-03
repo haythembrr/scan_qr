@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% if current_user.role == 2 %}
+    <p> 
+        <a href="{{ url_for('edit_machine', machine_id=machine_id) }}">Edit this machine</a>
+        <a href="{{ url_for('add_machine') }}">Add new machine</a>
+    </p>
+    {% endif %}
+    <table  valign="top-left">
+        <tr>
+            <td> Manufacturer </td>
+            <td> {{ machine.manufacturer }} </td>
+        </tr>
+        <tr>
+            <td> Location </td>
+            <td> {{ machine.location }} </td>
+        </tr>
+        <tr>
+            <td> Status </td>
+            <td> {{ machine.status }} </td>
+        </tr>
+        <tr>
+            <td> Install date </td>
+            <td> {{ machine.install_date }} </td>
+        </tr>
+        <tr>
+            <td> Comment </td>
+            <td> {{ machine.comment }} </td>
+        </tr>
+    </table>
+
+    <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+            <tr>
+              <td>{{ doc.type }}</td>
+              <td><a href = {{ url_for("display_pdf", file_id =  doc.id )}}>{{doc.id}}</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a href="{{ url_for('add_document', machine_id = machine_id) }}">Add new doc</a>
+    <hr>
+    <table>
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Type Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for interv in interventions %}
+          <tr>
+            <td>{{ interv.user_id }}</td>
+            <td>{{interv.start_date}}</td>
+            <td>{{interv.end_date }}</td>
+            <td>{{interv.type}}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <a href="{{ url_for('ongoing_intervention', machine_id = machine_id) }}">Start intervention</a>
+{% endblock %}

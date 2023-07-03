@@ -29,7 +29,7 @@ window.addEventListener("DOMContentLoaded", (event) => {
         button.classList.remove("hidden");
         button.classList.add("visible");
 
-        link.href = Flask.url_for("display_pdf", {"file_id": msg.file_id})
+        link.href = Flask.url_for("machine", {"machine_id": msg.machine_id})
 
 
       } else {

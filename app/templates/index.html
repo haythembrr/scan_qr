@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 
 {% block content %}
+    {% if current_user.role == 2 %}
+        <p style="text-align:right;" ><a href="{{ url_for('register') }}">Register a new user</a></p>
+        <p style="text-align:right;" ><a href="{{ url_for('add_machine') }}">Add a new machine</a></p>
+    {% endif %}
     <h2>Hi, {{ current_user.username }}!</h2>
     <div class="center">
         <h2>QR Code Scanner</h2>
